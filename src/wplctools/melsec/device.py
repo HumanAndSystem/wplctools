@@ -3,8 +3,6 @@
 
 import re
 
-from numpy import isin
-
 
 class Device:
     pass
