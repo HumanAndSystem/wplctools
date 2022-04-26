@@ -1,12 +1,15 @@
 from io import SEEK_CUR, BytesIO
 import struct
+from functools import lru_cache
 
 from ..utils import to_zerohex
+from .device import DEV, DeviceLexer
 
 
 __all__ = [
     "Instruction",
     "decode",
+    "encode",
 ]
 
 
@@ -115,7 +118,11 @@ LCPU                        L02SCPU, L02SCPU-P, L02CPU, L02CPU-P, L06CPU, L06CPU
 """
 
 
-_instruction_table = {
+class InstructionError(Exception):
+    pass
+
+
+_instruction_code_to_mnemonic_table = {
     # 5 SEQUENCE INSTRUCTIONS
     # 5.1 Contact Instructions
     0x00: { None: ("LD", 1) },
@@ -652,7 +659,53 @@ _instruction_table = {
 }
 
 
-_device_name_table = {
+_instruction_mnemonic_to_code_table = {}
+class InstructionCodeTable(dict):
+    def __init__(self):
+        for main_code, sub_table in _instruction_code_to_mnemonic_table.items():
+            for sub_code, (mnemonic, operand_count) in sub_table:
+                if mnemonic not in self:
+                    self[mnemonic] = {}
+                self[mnemonic][operand_count] = (main_code, sub_code)
+
+    def _get_code(self, mnemonic, operand_count):
+        if mnemonic in self:
+            count_table = self[mnemonic]
+            if operand_count in count_table:
+                return count_table[operand_count]
+        return None
+
+    @lru_cache
+    def get_code(self, mnemonic, operand_count):
+        code = self._get_code(mnemonic, operand_count)
+        if code is not None:
+            main, sub = code
+            if sub is None:
+                return [main]
+            return [main, sub]
+        if mnemonic.endswith("P"):
+            code = self._get_code(mnemonic[:-1], operand_count)
+            if code is not None:
+                return [main, sub, 0x02]
+        if mnemonic.startswith("LD"):
+            code = self._get_code(mnemonic[2:], operand_count)
+            if code is not None:
+                return [main, sub, 0x10]
+        elif mnemonic.startswith("AND"):
+            code = self._get_code(mnemonic[3:], operand_count)
+            if code is not None:
+                return [main, sub, 0x11]
+        elif mnemonic.startswith("OR"):
+            code = self._get_code(mnemonic[2:], operand_count)
+            if code is not None:
+                return [main, sub, 0x12]
+        raise InstructionError()
+ 
+_instruction_mnemonic_to_code_table = InstructionCodeTable()
+del InstructionCodeTable
+
+
+_device_code_to_name_table = {
     # 0x2c: ("RD", 10),
     # 0x50: ("LTC", 10),
     # 0x51: ("LTS", 10),
@@ -702,15 +755,15 @@ _device_name_table = {
     0xd1: ("I", 10),
     0xd8: ("U", 16),
     0xd9: ("J", 10),
-    0xe3: ("E", 10),  # double
+    0xe3: ("E", 10, "ED"),  # double
     0xe8: ("K", 10),
-    0xe9: ("K", 10),  # long
+    0xe9: ("K", 10, "KD"),  # long
     0xea: ("H", 16),
-    0xeb: ("H", 16),  # long
+    0xeb: ("H", 16, "HD"),  # long
     0xec: ("E", 10),  # float
     0xee: ('"', 10),  # string
-    0xf0: ("Z", 10),  # index
-    0xf1: ("K", 10),  # digit
+    0xf0: ("Z", 10, "-Z"),  # index
+    0xf1: ("K", 10, "K-"),  # digit
     0xf2: (".", 10),  # bit
     0xf3: ("@", 10),
     0xf8: ("U", 16),
@@ -720,21 +773,20 @@ _device_name_table = {
 
 class DeviceCodeTable(dict):
     def __init__(self):
-        for code, (name, base) in _device_name_table.items():
+        for code, (name, base, *aux) in _device_code_to_name_table.items():
+            if aux:
+                name = aux[0]
             if code in self:
-                codes = self[name]
-                if not isinstance(codes, list):
-                    codes = [codes]
-                    self[name] = codes
-                codes.append(code)
+                raise KeyError(f"duplicate name: {name}")
+                # codes = self[name]
+                # if not isinstance(codes, list):
+                #     codes = [codes]
+                #     self[name] = codes
+                # codes.append(code)
             else:
                 self[name] = code
-_device_code_table = DeviceCodeTable()
+_device_name_to_code_table = DeviceCodeTable()
 del DeviceCodeTable
-
-
-class InstructionError(Exception):
-    pass
 
 
 def _read_code(bs):
@@ -751,7 +803,7 @@ def _read_address(code):
 
 
 def _read_device(code):
-    name, base = _device_name_table.get(code[1], (None, None))
+    name, base, *aux = _device_code_to_name_table.get(code[1], (None, None))
     if name is None:
         raise InstructionError(f"unknown device: {code}")
     address = _read_address(code)
@@ -840,7 +892,7 @@ def decode(bs, *, encoding="mbcs", read_code=_read_code, decode_device=_decode_d
     if size == 2:
         return Instruction("NOP", [], 1)
 
-    info = _instruction_table.get(code[1], None)
+    info = _instruction_code_to_mnemonic_table.get(code[1], None)
     if info is None:
         raise InstructionError(f"unknown instruction: {code}")
     if callable(info):
@@ -873,8 +925,22 @@ def decode(bs, *, encoding="mbcs", read_code=_read_code, decode_device=_decode_d
 
 
 def _write_int(bs: BytesIO, n: int):
+    # bs = []
+    # n = int(num, base)
+    # while True:
+    #     n, x = divmod(n, 0x100)
+    #     bs.append(x)
+    #     if n == 0:
+    #         break
+    return bs
+
+
+def _write_float(bs: BytesIO, n: float):
+    pass
+
+
+def _to_byte_list(n):
     bs = []
-    n = int(num, base)
     while True:
         n, x = divmod(n, 0x100)
         bs.append(x)
@@ -883,8 +949,59 @@ def _write_int(bs: BytesIO, n: int):
     return bs
 
 
-def _write_float(bs: BytesIO, n: float):
-    pass
+class DeviceEncoder:
+    def __init__(self, bs: BytesIO, device: str, *, double=False):
+        if bs is None:
+            bs = BytesIO()
+        self.bs = bs
+        self.device = device
+        self.double = double
+        self.encode()
+
+    def encode_dev(self, name, num=None):
+        if isinstance(name, DEV):
+            name = (dev := name).name
+            num = dev.num
+        if self.double and name in ("K", "H", "E"):
+            name = f"{name}D"
+        code = _device_name_to_code_table.get(name, None)
+        if code is None:
+            raise Exception(f"unknown device: {self.device}")
+        if name in "E":
+            num = struct.pack("f", num)
+        elif name == "ED":
+            num = struct.pack("d", num)
+        else:
+            num = _to_byte_list(num)
+        size = len(num) + 3
+        self.bs.write(bytes([size, code, *num, size]))
+
+    def encode(self):
+        devs = DeviceLexer(self.device).lex()
+        dev_count = len(devs)
+        if dev_count == 1:
+            self.encode_dev(devs[0])
+        elif dev_count == 2:
+            dev1, dev2 = devs
+            if dev2.name == ".":
+                self.encode_dev(dev2)
+                self.encode_dev(dev1)
+            elif dev2.name == "Z":
+                self.encode_dev("-Z", dev2.num)
+                self.encode_dev(dev1)
+            elif dev1.name == "K":
+                self.encode_dev("K-", dev1.num)
+                self.encode_dev(dev2)
+            else:
+                self.encode_dev(dev1)
+                self.encode_dev(dev2)
+        else:
+            raise Exception(f"device error: {self.device}")
+
+
+def _write_device(bs: BytesIO, device: str, *, double=False) -> BytesIO:
+    encoder = DeviceEncoder(bs, device, double=double)
+    return encoder.bs
 
 
 def to_num(num, base=10):
@@ -916,13 +1033,7 @@ class ILCompiler:
         self.write_code(bytes(op))
 
     def write_device(self, device):
-        name, num = device[:1], device[1:]
-        match name:
-            case "M":
-                code = [0x90, *to_num(num)]
-            case _:
-                raise Exception(f"모르는 디바이스: {device}")
-        self.write_code(bytes(code))
+        _write_device(self.codes, device)
 
     def write_devices(self, devices):
         for device in devices:
