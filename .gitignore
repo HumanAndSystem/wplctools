@@ -3,3 +3,6 @@ __pycache__
 /src/wplctools.egg-info
 /tests/test.gxw
 /build
+*.obj
+*.exe
+*.pyd
