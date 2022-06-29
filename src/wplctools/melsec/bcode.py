@@ -663,7 +663,9 @@ _instruction_mnemonic_to_code_table = {}
 class InstructionCodeTable(dict):
     def __init__(self):
         for main_code, sub_table in _instruction_code_to_mnemonic_table.items():
-            for sub_code, (mnemonic, operand_count) in sub_table:
+            if callable(sub_table):
+                sub_table = sub_table(main_code)
+            for sub_code, (mnemonic, operand_count) in sub_table.items():
                 if mnemonic not in self:
                     self[mnemonic] = {}
                 self[mnemonic][operand_count] = (main_code, sub_code)
@@ -701,8 +703,8 @@ class InstructionCodeTable(dict):
                 return [main, sub, 0x12]
         raise InstructionError()
  
-_instruction_mnemonic_to_code_table = InstructionCodeTable()
-del InstructionCodeTable
+# _instruction_mnemonic_to_code_table = InstructionCodeTable()
+# del InstructionCodeTable
 
 
 _device_code_to_name_table = {
