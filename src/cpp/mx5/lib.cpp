@@ -322,13 +322,6 @@ public:
 
     DEF_PROPERTY(LONG, LogicalStationNumber)
     DEF_PROPERTY_STR(std::wstring, Password)
-
-    void Open(int stno = -1) {
-        if (stno >= 0) {
-            this->put_ActLogicalStationNumber(stno);
-        }
-        this->ActCommon::Open();
-    }
 };
 
 class ActProgType: public ActCommon<IActProgType64> {
@@ -384,7 +377,9 @@ PYBIND11_MODULE(_mx5, m) {
             if (p) std::rethrow_exception(p);
         } catch (const ActError &e) {
             std::wstring msg = _get_act_error_message(e.error_code());
-            PyErr_SetObject(act_error.ptr(), PyUnicode_FromWideChar(msg.c_str(), msg.length()));
+            // auto value = PyUnicode_FromWideChar(msg.c_str(), msg.length());
+            auto value = py::make_tuple(msg, e.error_code()).ptr();
+            PyErr_SetObject(act_error.ptr(), value);
         }
     });
 
@@ -402,7 +397,7 @@ PYBIND11_MODULE(_mx5, m) {
         .def_readwrite("CheckWritable", &ActUtlType::_check_writable)
         .def_property("ActLogicalStationNumber", &ActUtlType::get_ActLogicalStationNumber, &ActUtlType::put_ActLogicalStationNumber)
         .def_property("ActPassword", &ActUtlType::get_ActPassword, &ActUtlType::put_ActPassword)
-        .def("Open", &ActUtlType::Open, py::arg("stno") = -1)
+        .def("Open", &ActUtlType::Open)
         .def("Close", &ActUtlType::Close)
         .def("ReadDeviceBlock2", &ActUtlType::ReadDeviceBlock2, py::arg("device"), py::arg("size"), py::arg("data") = py::none(), py::arg("offset") = 0)
         .def("WriteDeviceBlock2", &ActUtlType::WriteDeviceBlock2, py::arg("device"), py::arg("size"), py::arg("data"), py::arg("offset") = 0)
@@ -426,7 +421,7 @@ PYBIND11_MODULE(_mx5, m) {
         .def_readwrite("check_writable", &ActUtlType::_check_writable)
         .def_property("logical_station_number", &ActUtlType::get_ActLogicalStationNumber, &ActUtlType::put_ActLogicalStationNumber)
         .def_property("password", &ActUtlType::get_ActPassword, &ActUtlType::put_ActPassword)
-        .def("open", &ActUtlType::Open, py::arg("stno") = -1)
+        .def("open", &ActUtlType::Open)
         .def("close", &ActUtlType::Close)
         .def("read_device_block2", &ActUtlType::ReadDeviceBlock2, py::arg("device"), py::arg("size"), py::arg("data") = py::none(), py::arg("offset") = 0)
         .def("write_device_block2", &ActUtlType::WriteDeviceBlock2, py::arg("device"), py::arg("size"), py::arg("data"), py::arg("offset") = 0)

@@ -1,4 +1,4 @@
-from ._mx5 import ActError, ActProgType as _ActProgType, ActUtlType
+from ._mx5 import ActError, ActProgType as _ActProgType, ActUtlType as _ActUtlType
 from . import ActDefine as Act
 
 
@@ -180,3 +180,10 @@ class ActProgType(_ActProgType):
         self.ActMultiDropChannelNumber = 0
 
         self.open()
+
+
+class ActUtlType(_ActUtlType):
+    def open(self, stno: int = -1):
+        if stno >= 0:
+            self.ActLogicalStationNumber = stno
+        self.Open()
