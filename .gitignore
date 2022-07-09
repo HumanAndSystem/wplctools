@@ -1,8 +1,9 @@
 __pycache__
-/dist
-/src/wplctools.egg-info
-/tests/test.gxw
-/build
 *.obj
 *.exe
 *.pyd
+/build
+/dist
+/src/wplctools.egg-info
+/tests/test.gxw
+/z.py

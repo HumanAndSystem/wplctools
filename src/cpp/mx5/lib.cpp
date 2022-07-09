@@ -31,7 +31,6 @@ public:
     operator BSTR*() { return &this->bstr; }
 };
 
-
 class _BUFFER {
 public:
     Py_buffer py_buffer = {};
@@ -210,7 +209,6 @@ public:
     }
 
     py::object ReadDeviceBlock(const wchar_t* device, int size, py::object data, int offset = 0) {
-        std::wcout << device << std::endl;
         if (data.is_none()) {
             data = py::bytearray("", size*sizeof(LONG));
         }
