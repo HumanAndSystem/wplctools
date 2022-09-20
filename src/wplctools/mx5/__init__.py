@@ -46,7 +46,7 @@ class ActProgType(_ActProgType):
         self.ActTargetSimulator = target
         self.open()
 
-    def open_qcpu_udp(self, host_address: str):
+    def open_qcpu_udp(self, host_address: str, network_num: int = 0, station_num: int = 0xff, cpu: int = 0x3ff):
         # ActCpuType 34 (CPU_Q02CPU) CPU type corresponding to the target station
         # ActDestinationIONumber 0 (0x00) Fixed to 0 (0x00) Fixed to 0 (0x00) Target station side
         # ■For single CPU
@@ -156,8 +156,22 @@ class ActProgType(_ActProgType):
 
         self.ActUnitType = Act.UNIT_QNETHER
         self.ActProtocolType = Act.PROTOCOL_UDPIP
-        self.ActIONumber = 0x3ff
+
         self.ActHostAddress = host_address
+        self.ActDestinationPortNumber = 5006
+        self.ActNetworkNumber = network_num
+        self.ActStationNumber = station_num
+        self.ActIONumber = cpu
+
+        # self.ActCpuType = 0x009a
+        # self.ActTimeOut = 60000  # ms
+
+        # C24나 CC-Link일 때
+        # self.ActIONumber = 0x020  # 접속국 경유 모듈 I/O
+        # self.ActMultiDropChannelNumber = 0
+        # self.ActUnitNumber = 0  # 대상국 국번
+        # self.ActDestinationIONumber = 0  # 대상국측 CPU
+
         self.open()
 
     def open_e71_udp(self, host: str, port: int, netno: int, stno: int):
@@ -183,7 +197,7 @@ class ActProgType(_ActProgType):
 
 
 class ActUtlType(_ActUtlType):
-    def open(self, stno: int = -1):
+    def open_station(self, stno: int = -1):
         if stno >= 0:
             self.ActLogicalStationNumber = stno
         self.Open()
