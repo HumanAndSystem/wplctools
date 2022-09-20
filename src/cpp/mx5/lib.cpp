@@ -378,8 +378,8 @@ PYBIND11_MODULE(_mx5, m) {
         } catch (const ActError &e) {
             std::wstring msg = _get_act_error_message(e.error_code());
             // auto value = PyUnicode_FromWideChar(msg.c_str(), msg.length());
-            auto value = py::make_tuple(msg, e.error_code()).ptr();
-            PyErr_SetObject(act_error.ptr(), value);
+            auto value = py::make_tuple(msg, e.error_code());
+            PyErr_SetObject(act_error.ptr(), value.ptr());
         }
     });
 
@@ -475,7 +475,7 @@ PYBIND11_MODULE(_mx5, m) {
         .def_property("ActPassword", &ActProgType::get_ActPassword, &ActProgType::put_ActPassword)
         .def_property("ActTargetSimulator", &ActProgType::get_ActTargetSimulator, &ActProgType::put_ActTargetSimulator)
         .def_property("ActUnitType", &ActProgType::get_ActUnitType, &ActProgType::put_ActUnitType)
-        .def_property("ActProtocolType", &ActProgType::get_ActProtocolType, &ActProgType::put_ActProtocolType)        .def("Open", &ActProgType::Open)
+        .def_property("ActProtocolType", &ActProgType::get_ActProtocolType, &ActProgType::put_ActProtocolType)
         .def("Open", &ActProgType::Open)
         .def("Close", &ActProgType::Close)
         .def("ReadDeviceBlock2", &ActProgType::ReadDeviceBlock2, py::arg("device"), py::arg("size"), py::arg("data") = py::none(), py::arg("offset") = 0)

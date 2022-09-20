@@ -18,8 +18,11 @@ def _get_act_file_path(lst: list, dir=""):
     return [str(_act_dir.joinpath(f"{dir}{filename}")) for filename in lst]
 
 
+act_sources = _get_act_file_path(["ActProgType64_i.c", "ActSupportMsg64_i.c", "ActUtlType64_i.c"], "Include/Wrapper/")
+act_include_dir = str(_get_act_dir().joinpath("Include"))
+
 ext_modules = [
-    Pybind11Extension("wplctools.melsec._device", ["src/cpp/_device.cpp"],
+    Pybind11Extension("wplctools.melsec._device", ["src/cpp/device/_device.cpp"],
         extra_compile_args = ["/utf-8", "/std:c++17"],
     ),
     # Pybind11Extension("_act5",
@@ -32,8 +35,14 @@ ext_modules = [
     #     extra_compile_args=["/utf-8", "/std:c++17"],
     # ),
     Pybind11Extension("wplctools.mx5._mx5",
-        sources = ["src/cpp/mx5/lib.cpp", *_get_act_file_path(["ActProgType64_i.c", "ActSupportMsg64_i.c", "ActUtlType64_i.c"], "Include/Wrapper/")],
-        include_dirs = [str(_get_act_dir().joinpath("Include"))],
+        sources = ["src/cpp/mx5/lib.cpp", *act_sources],
+        include_dirs = [act_include_dir],
+        libraries = ["Ole32", "OleAut32"],
+        extra_compile_args = ["/utf-8", "/std:c++17"],
+    ),
+    Pybind11Extension("wplctools.slmp._slmp",
+        sources = ["src/cpp/_slmp/lib.cpp", "src/cpp/_slmp/SLMP.c", *act_sources],
+        include_dirs = ["src/cpp/_slmp", act_include_dir],
         libraries = ["Ole32", "OleAut32"],
         extra_compile_args = ["/utf-8", "/std:c++17"],
     ),
